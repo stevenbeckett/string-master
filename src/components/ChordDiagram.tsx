@@ -2,9 +2,11 @@ import { memo } from 'react';
 import { NOTES, pitchAt, stringInfo } from '../music';
 import { chordName, pitchName, type BarreChord, type ChordKey, type ChordLabelMode } from '../chords';
 import type { OpenChord } from '../openChords';
+import type { FinderChord } from '../chordFinder';
 
-export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, labelMode = 'fingers' }: { chord: BarreChord | OpenChord; practiceKey?: ChordKey | null; labelMode?: ChordLabelMode }) {
+export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, labelMode = 'fingers' }: { chord: BarreChord | OpenChord | FinderChord; practiceKey?: ChordKey | null; labelMode?: ChordLabelMode }) {
   const barre = 'shape' in chord ? chord : null;
+  const displayName = 'name' in chord ? chord.name : chordName(chord, practiceKey);
   const lastFret = Math.max(12, ...chord.voices.map((voice) => voice.fret ?? 0));
   const nut = 142;
   const end = 1080;
@@ -15,7 +17,7 @@ export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, lab
 
   return <figure className="chord-diagram">
     <div className="chord-neck-scroll" tabIndex={0} role="region" aria-label={`Chord fretboard, open strings through fret ${lastFret}`}>
-      <svg viewBox="0 0 1120 278" role="img" data-last-fret={lastFret} data-label-mode={labelMode} aria-label={`${chordName(chord, practiceKey)}, ${barre ? `${barre.shape} shape, barre at fret ${barre.fret}` : 'open position'}`}>
+      <svg viewBox="0 0 1120 278" role="img" data-last-fret={lastFret} data-label-mode={labelMode} aria-label={`${displayName}, ${barre ? `${barre.shape} shape, barre at fret ${barre.fret}` : 'kind' in chord && chord.kind === 'finder' ? 'suggested voicing' : 'open position'}`}>
         <rect className="chord-neck-surface" x="66" y="40" width={end - 66} height="202" rx="12" />
         <rect className="chord-open-surface" x="66" y="40" width={nut - 66} height="202" rx="12" />
         {lastFret > 12 && <rect className="chord-neck-extension" x={nut + 12 * fretWidth} y="40" width={(lastFret - 12) * fretWidth} height="202" />}
@@ -51,10 +53,7 @@ export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, lab
         <text className="chord-fret-label" x={nut} y="270" textAnchor="middle">NUT</text>
       </svg>
     </div>
-    <figcaption>{labelMode === 'notes' ? 'Letters = notes' : 'Numbers = fingers'} · coral ring = root · {barre ? '' : '○ = open · '}× = muted string<br /><span>High e at the top · low E at the bottom · frets 0–{lastFret}</span></figcaption>
-    <div className="chord-voicing" role="group" aria-label={`${labelMode === 'notes' ? 'Chord notes' : 'Chord fret numbers'}, from low E to high E`}>
-      <span className="chord-voicing-title" aria-hidden="true">Low E → high e</span>
-      {chord.voices.map((voice) => <span key={voice.string} aria-label={`${stringInfo(voice.string).name} string: ${voice.fret === null ? 'muted' : `${voice.fret === 0 ? 'open string' : `fret ${voice.fret}${labelMode === 'fingers' ? `, finger ${voice.finger}` : ''}`}, ${pitchName(pitchAt({ string: voice.string, fret: voice.fret }), practiceKey)}`}`}><small>{voice.string === 1 ? 'e' : stringInfo(voice.string).note}</small><b>{voice.fret === null ? '×' : labelMode === 'notes' ? pitchName(pitchAt({ string: voice.string, fret: voice.fret }), practiceKey) : voice.fret === 0 ? '○' : voice.fret}</b></span>)}
-    </div>
+    <figcaption>{labelMode === 'notes' ? 'Notes shown' : 'Finger numbers shown'} · × = muted</figcaption>
+
   </figure>;
 });
