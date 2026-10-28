@@ -1,10 +1,10 @@
-import { keyTriads, validChordKey, validChordLabels, validChordSeconds, type ChordLabelMode, type ChordOptions, type GuitarChord } from './chords';
+import { DEFAULT_PRACTICE_MINUTES, keyTriads, validChordKey, validChordLabels, validChordSeconds, validPracticeMinutes, type ChordLabelMode, type ChordOptions, type GuitarChord } from './chords';
 
 export const OPEN_CHORD_PRACTICE_ID = 'open-chord-practice';
 export type OpenChordOptions = Pick<ChordOptions, 'quality' | 'key'>;
-export type OpenChordSettings = OpenChordOptions & { seconds: number; labels?: ChordLabelMode };
+export type OpenChordSettings = OpenChordOptions & { seconds: number; practiceMinutes?: number; labels?: ChordLabelMode };
 export type OpenChord = GuitarChord & { kind: 'open'; tip: string };
-export const DEFAULT_OPEN_SETTINGS: OpenChordSettings = { quality: 'both', seconds: 10 };
+export const DEFAULT_OPEN_SETTINGS: OpenChordSettings = { quality: 'both', seconds: 10, practiceMinutes: DEFAULT_PRACTICE_MINUTES };
 
 function define(root: number, quality: OpenChord['quality'], rootString: number, frets: (number | null)[], fingers: (number | null)[], tip: string): OpenChord {
   return { id: `open-${root}-${quality}`, kind: 'open', root, quality, rootString, tip,
@@ -38,5 +38,5 @@ export function validOpenSettings(value: unknown): value is OpenChordSettings {
   if (!value || typeof value !== 'object') return false;
   const settings = value as Partial<OpenChordSettings>;
   return ['both', 'major', 'minor'].includes(settings.quality ?? '') && typeof settings.seconds === 'number'
-    && validChordSeconds(settings.seconds) && (settings.key == null || validChordKey(settings.key)) && (settings.labels === undefined || validChordLabels(settings.labels));
+    && validChordSeconds(settings.seconds) && (settings.practiceMinutes === undefined || (typeof settings.practiceMinutes === 'number' && validPracticeMinutes(settings.practiceMinutes))) && (settings.key == null || validChordKey(settings.key)) && (settings.labels === undefined || validChordLabels(settings.labels));
 }

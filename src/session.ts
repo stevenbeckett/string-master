@@ -17,6 +17,7 @@ export type Session = {
   focused: string;
   placements: Record<string, Attempt>;
   recalls: Record<string, Attempt>;
+  recallMiss: string | null;
   feedback: string;
   feedbackKind: 'neutral' | 'correct' | 'retry';
 };
@@ -62,7 +63,7 @@ export function createSession(lesson: Lesson, random = Math.random, previousPitc
   const options = chordConfig?.options ?? DEFAULT_CHORD_OPTIONS;
   const barre = lesson.kind === 'barre' ? { prompt: randomChord(options, chordConfig?.previousId, random), options } : null;
   return { id: crypto.randomUUID(), lesson, phase: barre ? 'barre' : collection ? 'collect' : finalTest ? 'recall' : 'learn', positions, order, collection, barre, paletteOrder: jumbleNotes(Array.from({ length: 12 }, (_, pitch) => pitch), random), index: 0, selected: null,
-    focused: positions[0] ? positionKey(positions[0]) : '', placements: freshAttempts(positions), recalls: freshAttempts(order),
+    focused: positions[0] ? positionKey(positions[0]) : '', placements: freshAttempts(positions), recalls: freshAttempts(order), recallMiss: null,
     feedback: collection ? 'Pick any matching position. Open strings count too.' : finalTest ? 'Twelve notes, one string. Find each note from memory, at your own pace.' : '', feedbackKind: 'neutral' };
 }
 export const placementComplete = (s: Session) => Object.values(s.placements).every((a) => a.solved);
@@ -117,14 +118,14 @@ export function sessionReducer(s: Session, action: SessionAction): Session {
     return { ...s, focused: key, placements: { ...s.placements, [key]: { ...attempt, mistakes: attempt.mistakes + (correct ? 0 : 1), solved: correct } },
       feedback: correct ? `✓ ${noteLabel(action.pitch)} belongs here. Nicely placed.` : 'Not quite. Try another note, or ask for a hint.', feedbackKind: correct ? 'correct' : 'retry' };
   }
-  if (action.type === 'START_RECALL' && s.phase === 'place' && placementComplete(s)) return { ...s, phase: 'recall', selected: null, focused: positionKey(s.positions[0]), feedback: 'A fresh board. Find the note using what you remember.', feedbackKind: 'neutral' };
+  if (action.type === 'START_RECALL' && s.phase === 'place' && placementComplete(s)) return { ...s, phase: 'recall', selected: null, focused: positionKey(s.positions[0]), recallMiss: null, feedback: 'A fresh board. Find the note using what you remember.', feedbackKind: 'neutral' };
   if (action.type === 'RECALL' && s.phase === 'recall') {
     const target = currentTarget(s);
     const key = positionKey(target);
     const attempt = s.recalls[key];
     if (attempt.solved || !s.positions.some((p) => positionKey(p) === positionKey(action.position))) return s;
     const correct = action.position.string === target.string && pitchAt(action.position) === pitchAt(target);
-    return { ...s, focused: positionKey(action.position), recalls: { ...s.recalls, [key]: { ...attempt, solved: correct, mistakes: attempt.mistakes + (correct ? 0 : 1) } },
+    return { ...s, focused: positionKey(action.position), recallMiss: correct ? null : positionKey(action.position), recalls: { ...s.recalls, [key]: { ...attempt, solved: correct, mistakes: attempt.mistakes + (correct ? 0 : 1) } },
       feedback: correct ? `✓ That's ${noteLabel(pitchAt(target))}. Nicely found.` : `Not quite. Look on the ${positionLabel(target).split(',')[0]}. Take your time.`, feedbackKind: correct ? 'correct' : 'retry' };
   }
   if (action.type === 'HINT' && (s.phase === 'place' || s.phase === 'recall')) {
@@ -133,20 +134,30 @@ export function sessionReducer(s: Session, action: SessionAction): Session {
     const field = s.phase === 'place' ? 'placements' : 'recalls';
     const attempt = s[field][key];
     if (attempt.solved) return s;
-    return { ...s, focused: key, [field]: { ...s[field], [key]: { ...attempt, hints: Math.min(3, attempt.hints + 1) } } };
+    return { ...s, focused: key, ...(s.phase === 'recall' ? { recallMiss: null, feedback: 'Use the clue below the board, then try the position again.', feedbackKind: 'neutral' as const } : {}), [field]: { ...s[field], [key]: { ...attempt, hints: Math.min(3, attempt.hints + 1) } } };
   }
   if (action.type === 'NEXT' && s.phase === 'recall' && s.recalls[positionKey(currentTarget(s))].solved) {
-    if (s.index === s.order.length - 1) return { ...s, phase: 'results', feedback: '' };
-    return { ...s, index: s.index + 1, focused: positionKey(s.positions[0]), feedback: 'Find the next note. The board is clear again.', feedbackKind: 'neutral' };
+    if (s.index === s.order.length - 1) return { ...s, phase: 'results', recallMiss: null, feedback: '' };
+    return { ...s, index: s.index + 1, focused: positionKey(s.positions[0]), recallMiss: null, feedback: 'Find the next note. The board is clear again.', feedbackKind: 'neutral' };
   }
   return s;
 }
 
 export function sessionResults(s: Session) {
   const attempts = Object.values(s.recalls);
+  const correct = attempts.filter((a) => a.solved).length;
+  const mistakes = s.collection ? s.collection.mistakes : attempts.reduce((sum, a) => sum + a.mistakes, 0);
   const unaided = attempts.filter((a) => a.solved && a.mistakes === 0 && a.hints === 0 && !a.mapViewed).length;
-  return { total: attempts.length, unaided, accuracy: attempts.length ? Math.round(unaided / attempts.length * 100) : 0,
+  return { total: attempts.length, correct, attempts: correct + mistakes, unaided, accuracy: attempts.length ? Math.round(unaided / attempts.length * 100) : 0,
     assisted: attempts.filter((a) => a.hints > 0 || a.mapViewed).length,
-    retries: s.collection ? s.collection.mistakes : attempts.filter((a) => a.mistakes > 0).length,
+    retries: s.collection ? s.collection.mistakes : mistakes,
     placementHints: Object.values(s.placements).filter((a) => a.hints > 0).length };
+}
+
+export function runningScore(s: Session) {
+  const attempts = Object.values(s.phase === 'place' ? s.placements : s.recalls);
+  const correct = attempts.filter((attempt) => attempt.solved).length;
+  const misses = s.collection ? s.collection.mistakes : attempts.reduce((sum, attempt) => sum + attempt.mistakes, 0);
+  const total = correct + misses;
+  return { attempts: total, correct, misses, hints: attempts.reduce((sum, attempt) => sum + attempt.hints, 0), accuracy: total ? Math.round(correct / total * 100) : 0 };
 }

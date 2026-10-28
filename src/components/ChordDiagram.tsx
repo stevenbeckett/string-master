@@ -19,6 +19,8 @@ export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, lab
         <rect className="chord-neck-surface" x="66" y="40" width={end - 66} height="202" rx="12" />
         <rect className="chord-open-surface" x="66" y="40" width={nut - 66} height="202" rx="12" />
         {lastFret > 12 && <rect className="chord-neck-extension" x={nut + 12 * fretWidth} y="40" width={(lastFret - 12) * fretWidth} height="202" />}
+        {[3, 5, 7, 9, 15, 17, 19, 21].filter((fret) => fret <= lastFret).map((fret) => <circle className="chord-inlay" key={fret} cx={xAt(fret)} cy="141" r="7" />)}
+        {lastFret >= 12 && <><circle className="chord-inlay" cx={xAt(12)} cy="73" r="7" /><circle className="chord-inlay" cx={xAt(12)} cy="209" r="7" /></>}
         <text className="chord-fret-label" x="25" y="23" textAnchor="middle">STRING</text>
         <text className="chord-fret-label" x={xAt(0)} y="23" textAnchor="middle">OPEN</text>
         {Array.from({ length: lastFret }, (_, i) => i + 1).map((fret) => <g key={fret}>
@@ -46,8 +48,6 @@ export const ChordDiagram = memo(function ChordDiagram({ chord, practiceKey, lab
             </>}
           </g>;
         })}
-        {[3, 5, 7, 9].map((fret) => <circle className="chord-inlay" key={fret} cx={xAt(fret)} cy="258" r="3" />)}
-        <circle className="chord-inlay" cx={xAt(12) - 5} cy="258" r="3" /><circle className="chord-inlay" cx={xAt(12) + 5} cy="258" r="3" />
         <text className="chord-fret-label" x={nut} y="270" textAnchor="middle">NUT</text>
       </svg>
     </div>

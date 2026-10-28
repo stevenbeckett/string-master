@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { MAX_FRET, NOTES, STRINGS, midiAt, noteLabel, pitchAt, positionKey, positionLabel, stringInfo, type Position } from '../music';
-import { collectionComplete, currentTarget, hintBand, sessionResults, type Session, type SessionAction } from '../session';
+import { collectionComplete, currentTarget, hintBand, runningScore, sessionResults, type Session, type SessionAction } from '../session';
 import { Fretboard, NoteName } from './Fretboard';
 import { Icon } from './Icon';
 
@@ -24,6 +24,7 @@ export function CollectionLesson({ session: s, dispatch, play, openLesson, goHom
   const found = matches.filter((attempt) => attempt.solved).length;
   const complete = collectionComplete(s);
   const result = sessionResults(s);
+  const score = runningScore(s);
 
   useEffect(() => {
     if (!showAllNotes && hints >= 2 && s.phase === 'collect') {
@@ -82,12 +83,26 @@ export function CollectionLesson({ session: s, dispatch, play, openLesson, goHom
         })}
       </div>
       </>}
+      {!showAllNotes && <>
+        <div className="running-score" role="group" aria-label="Running score">
+          <div className="running-score-heading"><span className="running-score-title">SESSION SCORE</span><span className="running-score-progress-label">{score.correct} <span>of</span> {matches.length} found</span></div>
+          <div className="running-score-track" role="progressbar" aria-label="Notes found" aria-valuemin={0} aria-valuemax={matches.length} aria-valuenow={score.correct}><span style={{ width: `${matches.length ? score.correct / matches.length * 100 : 0}%` }} /></div>
+          <div className="running-score-metrics">
+            <span><strong>{score.attempts}</strong><small>Attempts</small></span>
+            <span className="score-correct"><strong>{score.correct}</strong><small>Correct</small></span>
+            <span className="score-misses"><strong>{score.misses}</strong><small>Misses</small></span>
+            <span><strong>{score.hints}</strong><small>Hints</small></span>
+            <span className="score-accuracy"><strong>{score.accuracy}%</strong><small>Accuracy</small></span>
+          </div>
+        </div>
+        <div className={`feedback feedback-banner ${s.feedbackKind}`} role="status" aria-live="polite">{complete ? `✓ All ${matches.length} instances found. Nicely connected.` : s.feedback}</div>
+      </>}
       <div className="board-card collection-board">
         <div className="board-topline"><span><span className="live-dot" /> STANDARD TUNING <span className="board-tuning">E A D G B E</span></span><span>Open strings – fret {MAX_FRET}<span className="neck-scroll-hint"> · Scroll sideways to explore</span></span></div>
         <Fretboard session={s} onPosition={collect} onFocus={(position) => dispatch({ type: 'FOCUS', key: positionKey(position) })} onDrop={() => {}} noteMap={showAllNotes ? { highlightedPitch } : undefined} />
         <div className="board-bottomline"><span id="board-instructions">{showAllNotes ? 'Click a note to highlight its matches and hear it. Arrow keys and Enter work too.' : 'Click a dot, or use the arrow keys and Enter. Find the same note on any string.'}</span><span><i className="legend-dot" /> {showAllNotes ? highlightedPitch === null ? 'All note names visible' : `${highlightedCount} highlighted · all names visible` : `${found} matching positions collected`}</span></div>
       </div>
-      {showAllNotes ? <><p className="collection-study-info"><Icon name="book" size={15} />Your search is kept. Unfound positions in this round count as assisted.</p><div className="lesson-footer"><p>Look for the pattern 12 frets apart. Sharp and flat names share one pitch.</p><button className="button secondary" onClick={() => setShowAllNotes(false)}>Back to finding notes <Icon name="arrow" size={17} /></button></div></> : <><div className={`feedback ${s.feedbackKind}`} role="status" aria-live="polite">{complete ? `✓ All ${matches.length} instances found. Nicely connected.` : s.feedback}</div>
+      {showAllNotes ? <><p className="collection-study-info"><Icon name="book" size={15} />Your search is kept. Unfound positions in this round count as assisted.</p><div className="lesson-footer"><p>Look for the pattern 12 frets apart. Sharp and flat names share one pitch.</p><button className="button secondary" onClick={() => setShowAllNotes(false)}>Back to finding notes <Icon name="arrow" size={17} /></button></div></> : <>
       <div className="hint-panel collection-hints">
         <div className="hint-copy"><Icon name="help" size={19} /><div>
           <h3>{complete ? 'A full map of one note.' : hints ? `Your next clue · ${stringInfo(target.string).name} string` : 'Need a way in?'}</h3>

@@ -24,6 +24,7 @@ export function Fretboard({ session, onPosition, onFocus, onDrop, noteMap }: {
   const slotWidth = Math.min(64, fretWidth - 6);
   const collecting = session.phase === 'collect';
   const exploring = !!noteMap;
+  const concealOpenTuning = session.lesson.kind === 'open' && session.phase !== 'learn';
   const active = new Set(session.positions.map(positionKey));
   const hint = hintTarget(session);
   const hintKey = positionKey(hint);
@@ -49,19 +50,19 @@ export function Fretboard({ session, onPosition, onFocus, onDrop, noteMap }: {
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className="neck-svg" aria-hidden="true">
       <rect className="neck-surface" x="65" y="42" width="1002" height="230" rx="12" />
       <rect className="open-surface" x="65" y="42" width="66" height="230" rx="10" />
-      {session.positions.map((p) => <rect className="practice-highlight" key={positionKey(p)} x={xAt(p.fret) - slotWidth / 2} y={yAt(p.string) - 18} width={slotWidth} height="36" rx="10" />)}
+      {session.phase === 'learn' && session.positions.map((p) => <rect className="practice-highlight" key={positionKey(p)} x={xAt(p.fret) - slotWidth / 2} y={yAt(p.string) - 18} width={slotWidth} height="36" rx="10" />)}
       {collecting && hintLevel >= 2 && <rect className="hinted-range" x={area.start === 0 ? 65 : xAt(area.start) - fretWidth / 2} y={yAt(hint.string) - 18} width={area.start === 0 ? xAt(area.end) + fretWidth / 2 - 65 : (area.end - area.start + 1) * fretWidth} height="36" rx="8" />}
+      {[3, 5, 7, 9, 15, 17, 19, 21].filter((fret) => fret <= fretCount).map((fret) => <circle className="fret-inlay" key={fret} cx={xAt(fret)} cy="157" r="7" />)}
+      {fretCount >= 12 && <><circle className="fret-inlay" cx={xAt(12)} cy="81" r="7" /><circle className="fret-inlay" cx={xAt(12)} cy="233" r="7" /></>}
       {Array.from({ length: fretCount }, (_, i) => <line className="fret-wire" key={i} x1={131 + (i + 1) * fretWidth} x2={131 + (i + 1) * fretWidth} y1="43" y2="271" strokeWidth="1.3" />)}
       {[...STRINGS].reverse().map((s) => <g key={s.id} opacity={session.positions.some((p) => p.string === s.id) ? 1 : .32}>
         <line className={`string-wire ${collecting && hintLevel >= 1 && hint.string === s.id ? 'hinted-string' : ''}`} x1="65" x2="1067" y1={yAt(s.id)} y2={yAt(s.id)} strokeWidth={.8 + s.id * .22} />
-        <text className="string-name" x="21" y={yAt(s.id) + 5} fontSize="17" fontFamily="inherit">{s.id === 1 ? 'e' : s.note}</text>
+        <text className="string-name" x="21" y={yAt(s.id) + 5} fontSize="17" fontFamily="inherit">{concealOpenTuning ? '·' : s.id === 1 ? 'e' : s.note}</text>
         <text className="string-number" x="43" y={yAt(s.id) + 4} fontSize="12" fontFamily="inherit">{s.id}</text>
       </g>)}
       <line className="nut-line" x1="131" x2="131" y1="42" y2="272" strokeWidth="5" />
       <text x="12" y="22" className="neck-caption">STRING</text>
       {Array.from({ length: fretCount + 1 }, (_, fret) => <text key={fret} x={xAt(fret)} y="23" textAnchor="middle" className="neck-caption">{fret === 0 ? 'OPEN' : fret}</text>)}
-      {[3, 5, 7, 9, 15, 17, 19, 21].filter((fret) => fret <= fretCount).map((fret) => <circle className="fret-inlay" key={fret} cx={xAt(fret)} cy="294" r="3.5" />)}
-      <circle className="fret-inlay" cx={xAt(12)} cy="288" r="3" /><circle className="fret-inlay" cx={xAt(12)} cy="300" r="3" />
       <text x="131" y="318" textAnchor="middle" className="neck-caption">NUT</text>
       {!collecting && hintLevel >= 2 && hint.fret > 0 && <path className="hint-route" d={`M92 ${yAt(hint.string)} H${xAt(hint.fret)}`} fill="none" strokeWidth="3" strokeDasharray="5 6" />}
     </svg>
@@ -73,7 +74,7 @@ export function Fretboard({ session, onPosition, onFocus, onDrop, noteMap }: {
       const answered = session.phase === 'learn' && isActive || session.phase === 'place' && session.placements[key]?.solved || session.phase === 'recall' && key === positionKey(target) && targetSolved || collecting && session.recalls[key]?.solved;
       const revealed = hintLevel === 3 && key === hintKey;
       const anchor = !collecting && hintLevel >= 1 && p.string === hint.string && p.fret === 0;
-      const missed = !exploring && collecting && session.collection?.lastMiss === key;
+      const missed = !exploring && (collecting ? session.collection?.lastMiss === key : session.phase === 'recall' && session.recallMiss === key);
       const highlighted = exploring && noteMap.highlightedPitch === pitch;
       const showNote = exploring || answered || revealed || anchor;
       if (!isActive && !anchor) return null;
@@ -81,6 +82,7 @@ export function Fretboard({ session, onPosition, onFocus, onDrop, noteMap }: {
       return <button key={key} type="button" data-position={key} data-answered={!!answered} data-revealed={revealed || anchor} data-incorrect={!!missed} data-highlighted={highlighted}
         className={`fret-position ${showNote ? 'with-note' : 'empty-position'} ${answered ? 'answered' : ''} ${revealed ? 'revealed' : ''} ${anchor ? 'anchor' : ''} ${missed ? 'missed' : ''} ${highlighted ? 'map-highlighted' : exploring && noteMap.highlightedPitch !== null ? 'map-other' : ''}`}
         style={style} disabled={!isActive} tabIndex={key === focusKey ? 0 : -1}
+        aria-invalid={missed || undefined}
         aria-pressed={exploring ? highlighted : undefined}
         aria-label={`${positionLabel(p)}${showNote ? `, ${noteLabel(pitch)}${revealed ? ', hint' : ''}${highlighted ? ', highlighted' : ''}` : ''}`}
         onFocus={() => onFocus(p)} onKeyDown={(event) => moveFocus(event, p)} onClick={() => onPosition(p)}

@@ -5,7 +5,7 @@ export type ChordQuality = 'major' | 'minor';
 export type ChordLabelMode = 'fingers' | 'notes';
 export type ChordKey = { tonic: number; mode: 'major' | 'minor' };
 export type ChordOptions = { shape: ChordShape | 'both'; quality: ChordQuality | 'both'; key?: ChordKey | null };
-export type BarrePracticeSettings = ChordOptions & { seconds: number; labels?: ChordLabelMode };
+export type BarrePracticeSettings = ChordOptions & { seconds: number; practiceMinutes?: number; labels?: ChordLabelMode };
 export type ChordVoice = { string: number; fret: number | null; finger: number | null };
 export type GuitarChord = {
   id: string;
@@ -16,8 +16,10 @@ export type GuitarChord = {
 };
 export type BarreChord = GuitarChord & { shape: ChordShape; fret: number };
 export const DEFAULT_CHORD_OPTIONS: ChordOptions = { shape: 'both', quality: 'both' };
-export const DEFAULT_BARRE_SETTINGS: BarrePracticeSettings = { ...DEFAULT_CHORD_OPTIONS, seconds: 10 };
+export const DEFAULT_PRACTICE_MINUTES = 2;
+export const DEFAULT_BARRE_SETTINGS: BarrePracticeSettings = { ...DEFAULT_CHORD_OPTIONS, seconds: 10, practiceMinutes: DEFAULT_PRACTICE_MINUTES };
 export const validChordSeconds = (seconds: number) => Number.isInteger(seconds) && seconds >= 1 && seconds <= 300;
+export const validPracticeMinutes = (minutes: number) => Number.isInteger(minutes) && minutes >= 1 && minutes <= 300;
 export const validChordLabels = (value: unknown): value is ChordLabelMode => value === 'fingers' || value === 'notes';
 export function validChordKey(value: unknown): value is ChordKey {
   if (!value || typeof value !== 'object') return false;
@@ -27,7 +29,7 @@ export function validChordKey(value: unknown): value is ChordKey {
 export function validBarreSettings(value: unknown): value is BarrePracticeSettings {
   if (!value || typeof value !== 'object') return false;
   const settings = value as Partial<BarrePracticeSettings>;
-  return ['both', 'E', 'A'].includes(settings.shape ?? '') && ['both', 'major', 'minor'].includes(settings.quality ?? '') && typeof settings.seconds === 'number' && validChordSeconds(settings.seconds) && (settings.key == null || validChordKey(settings.key)) && (settings.labels === undefined || validChordLabels(settings.labels));
+  return ['both', 'E', 'A'].includes(settings.shape ?? '') && ['both', 'major', 'minor'].includes(settings.quality ?? '') && typeof settings.seconds === 'number' && validChordSeconds(settings.seconds) && (settings.practiceMinutes === undefined || (typeof settings.practiceMinutes === 'number' && validPracticeMinutes(settings.practiceMinutes))) && (settings.key == null || validChordKey(settings.key)) && (settings.labels === undefined || validChordLabels(settings.labels));
 }
 
 // Use common enharmonic spellings, avoiding keys needing double accidentals.
